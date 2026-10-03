@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -289,7 +290,16 @@ fun ScoreEntryScreen(viewModel: SkyjoViewModel) {
     var finisherName by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("Enter Scores", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Enter Scores", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { viewModel.currentScreen.value = Screen.Game }) {
+                Text("Back to Game")
+            }
+        }
         Spacer(modifier = Modifier.height(16.dp))
         
         Row(
@@ -366,25 +376,87 @@ fun ScoreEntryScreen(viewModel: SkyjoViewModel) {
 
 @Composable
 fun WinnerScreen(viewModel: SkyjoViewModel) {
+    val rankedPlayers = remember(viewModel.players) {
+        viewModel.players.sortedBy { it.totalScore }
+    }
+    val roundsCount = viewModel.players.firstOrNull()?.scores?.size ?: 0
+
     Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Game Over!", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+        Text("Game Over!", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text("Total Rounds Played: $roundsCount", fontSize = 16.sp, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Text("Final Standings:", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("The winner is:", fontSize = 20.sp)
-        Text(
-            viewModel.winner.value?.name ?: "Unknown",
-            fontSize = 36.sp,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.ExtraBold
-        )
-        Text("Total Score: ${viewModel.winner.value?.totalScore ?: 0}", fontSize = 24.sp)
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            itemsIndexed(rankedPlayers) { index, player ->
+                val isWinner = index == 0
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = if (isWinner) {
+                        androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    } else {
+                        androidx.compose.material3.CardDefaults.cardColors()
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${index + 1}.",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isWinner) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = player.name,
+                                    fontSize = 18.sp,
+                                    fontWeight = if (isWinner) FontWeight.ExtraBold else FontWeight.Normal,
+                                    color = if (isWinner) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (isWinner) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "👑 Winner",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            text = "${player.totalScore} pts",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isWinner) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
         
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        Button(onClick = { viewModel.resetGame() }) {
+        Button(
+            onClick = { viewModel.resetGame() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text("New Game")
         }
     }
