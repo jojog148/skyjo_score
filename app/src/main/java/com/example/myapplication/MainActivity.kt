@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -68,7 +67,8 @@ fun SkyjoApp(viewModel: SkyjoViewModel) {
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
             when (viewModel.currentScreen.value) {
-                Screen.Setup -> SetupScreen(viewModel)
+                Screen.Main -> MainScreen(viewModel)
+                Screen.NewGame -> NewGameScreen(viewModel)
                 Screen.Game -> GameScreen(viewModel)
                 Screen.ScoreEntry -> ScoreEntryScreen(viewModel)
                 Screen.Winner -> WinnerScreen(viewModel)
@@ -78,57 +78,144 @@ fun SkyjoApp(viewModel: SkyjoViewModel) {
 }
 
 @Composable
-fun SetupScreen(viewModel: SkyjoViewModel) {
-    var playerName by remember { mutableStateOf("") }
-    var showSaveDialog by remember { mutableStateOf(false) }
-    var groupName by remember { mutableStateOf("") }
+fun MainScreen(viewModel: SkyjoViewModel) {
     val savedGroups by viewModel.savedGroups.collectAsState()
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("skyjo_score", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Skyjo Games", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Button(onClick = { viewModel.goToNewGame() }) {
+                Text("New Game")
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+        Text("Saved Games (Tap to Play):", fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (savedGroups.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize().weight(1f),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("No games created yet.", color = MaterialTheme.colorScheme.outline)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = { viewModel.goToNewGame() }) {
+                    Text("Create Your First Game")
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(savedGroups.keys.toList()) { name ->
+                    val groupPlayers = savedGroups[name]!!
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.loadGroup(name, groupPlayers) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Players: " + groupPlayers.joinToString(", ") { it.name },
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                val total = groupPlayers.sumOf { it.scores.sum() }
+                                val rounds = groupPlayers.firstOrNull()?.scores?.size ?: 0
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    "Rounds: $rounds | Total Score: $total",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(onClick = { viewModel.deleteGroup(name) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Game", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NewGameScreen(viewModel: SkyjoViewModel) {
+    var gameName by remember { mutableStateOf("") }
+    var playerName by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("New Game", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { viewModel.goToMain() }) {
+                Text("Cancel")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = gameName,
+            onValueChange = { gameName = it },
+            label = { Text("Game Name (e.g. Friday Night)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         OutlinedTextField(
             value = playerName,
             onValueChange = { playerName = it },
             label = { Text("Player Name") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
         )
-        
+
         Button(
             onClick = {
-                viewModel.addPlayer(playerName)
-                playerName = ""
+                if (playerName.isNotBlank()) {
+                    viewModel.addPlayer(playerName)
+                    playerName = ""
+                }
             },
-            modifier = Modifier.padding(vertical = 8.dp)
+            modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()
         ) {
             Text("Add Player")
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Current Players:", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            if (viewModel.players.size >= 2) {
-                TextButton(onClick = { viewModel.startGame() }) {
-                    Text("Start")
-                }
-            }
-            if (viewModel.players.isNotEmpty()) {
-                TextButton(onClick = { showSaveDialog = true }) {
-                    Text("Save List")
-                }
-            }
-        }
-        
-        LazyColumn(modifier = Modifier.height(150.dp)) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Players (${viewModel.players.size}):", fontWeight = FontWeight.SemiBold)
+
+        LazyColumn(
+            modifier = Modifier.height(180.dp).fillMaxWidth()
+        ) {
             items(viewModel.players) { player ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("- ${player.name}")
+                    Text("- ${player.name}", fontSize = 16.sp)
                     IconButton(onClick = { viewModel.removePlayer(player) }) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                     }
@@ -136,63 +223,27 @@ fun SetupScreen(viewModel: SkyjoViewModel) {
             }
         }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-        
-        Text("Saved Groups (Tap to Play):", fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
-        LazyColumn(modifier = Modifier.height(200.dp)) {
-            items(savedGroups.keys.toList()) { name ->
-                val groupPlayers = savedGroups[name]!!
-                Row(
-                    modifier = Modifier.fillMaxWidth().clickable { viewModel.loadGroup(name, groupPlayers) }.padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(name, fontWeight = FontWeight.Bold)
-                        Text(
-                            "Players: " + (savedGroups[name]?.joinToString(", ") { it.name } ?: ""),
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                        val total = savedGroups[name]?.sumOf { it.scores.sum() } ?: 0
-                        if (total > 0) {
-                            Text("Total Score: $total", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    IconButton(onClick = { viewModel.deleteGroup(name) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete Group")
-                    }
-                }
-            }
-        }
-    }
+        Spacer(modifier = Modifier.weight(1f))
 
-    if (showSaveDialog) {
-        AlertDialog(
-            onDismissRequest = { showSaveDialog = false },
-            title = { Text("Save Player List") },
-            text = {
-                OutlinedTextField(
-                    value = groupName,
-                    onValueChange = { groupName = it },
-                    label = { Text("Group Name (e.g. Family)") }
-                )
+        Button(
+            onClick = {
+                viewModel.createNewGame(gameName)
             },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.saveCurrentGroup(groupName)
-                    showSaveDialog = false
-                    groupName = ""
-                }) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSaveDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
+            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+            enabled = gameName.isNotBlank() && viewModel.players.size >= 2
+        ) {
+            Text("Start Game & Enter Scores")
+        }
+
+        if (gameName.isBlank() || viewModel.players.size < 2) {
+            Text(
+                text = if (gameName.isBlank()) "Please enter a game name" else "Please add at least 2 players",
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }
 
@@ -206,9 +257,9 @@ fun GameScreen(viewModel: SkyjoViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Current Scores", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            TextButton(onClick = { viewModel.goToSetup() }) {
-                Text("Back to Setup")
+            Text(viewModel.activeGroupName.value ?: "Current Scores", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { viewModel.goToMain() }) {
+                Text("Back to Games")
             }
         }
         
@@ -454,10 +505,10 @@ fun WinnerScreen(viewModel: SkyjoViewModel) {
         Spacer(modifier = Modifier.height(16.dp))
         
         Button(
-            onClick = { viewModel.resetGame() },
+            onClick = { viewModel.goToMain() },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("New Game")
+            Text("Back to Games List")
         }
     }
 }

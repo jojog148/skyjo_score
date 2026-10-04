@@ -18,7 +18,8 @@ data class Player(
 }
 
 enum class Screen {
-    Setup,
+    Main,
+    NewGame,
     Game,
     ScoreEntry,
     Winner
@@ -26,7 +27,7 @@ enum class Screen {
 
 class SkyjoViewModel(application: Application) : AndroidViewModel(application) {
     val players = mutableStateListOf<Player>()
-    val currentScreen = mutableStateOf(Screen.Setup)
+    val currentScreen = mutableStateOf(Screen.Main)
     val winner = mutableStateOf<Player?>(null)
     val activeGroupName = mutableStateOf<String?>(null)
 
@@ -83,20 +84,36 @@ class SkyjoViewModel(application: Application) : AndroidViewModel(application) {
     fun addPlayer(name: String) {
         if (name.isNotBlank() && !players.any { it.name == name }) {
             players.add(Player(name))
-            activeGroupName.value = null // Modifying list breaks the group link
             persistGame()
         }
     }
 
     fun removePlayer(player: Player) {
         players.remove(player)
-        activeGroupName.value = null // Modifying list breaks the group link
         persistGame()
     }
 
-    fun saveCurrentGroup(groupName: String) {
-        if (groupName.isNotBlank() && players.isNotEmpty()) {
-            activeGroupName.value = groupName
+    fun goToMain() {
+        currentScreen.value = Screen.Main
+        activeGroupName.value = null
+        persistGame()
+    }
+
+    fun goToNewGame() {
+        players.clear()
+        activeGroupName.value = null
+        currentScreen.value = Screen.NewGame
+    }
+
+    fun createNewGame(gameName: String) {
+        if (gameName.isNotBlank() && players.size >= 2) {
+            val trimmedName = gameName.trim()
+            activeGroupName.value = trimmedName
+            val playerList = players.map { PlayerData(it.name, it.scores.toList()) }
+            viewModelScope.launch {
+                PlayerStorage.saveGroup(getApplication(), trimmedName, playerList)
+            }
+            currentScreen.value = Screen.Game
             persistGame()
         }
     }
@@ -110,7 +127,14 @@ class SkyjoViewModel(application: Application) : AndroidViewModel(application) {
             players.add(player)
         }
         winner.value = null
-        startGame()
+        val reached100 = players.filter { it.totalScore >= 100 }
+        if (reached100.isNotEmpty()) {
+            winner.value = players.minByOrNull { it.totalScore }
+            currentScreen.value = Screen.Winner
+        } else {
+            currentScreen.value = Screen.Game
+        }
+        persistGame()
     }
 
     fun deleteGroup(groupName: String) {
@@ -127,11 +151,6 @@ class SkyjoViewModel(application: Application) : AndroidViewModel(application) {
             currentScreen.value = Screen.Game
             persistGame()
         }
-    }
-
-    fun goToSetup() {
-        currentScreen.value = Screen.Setup
-        persistGame()
     }
 
     fun enterScores(newScores: Map<String, Int>, finisherName: String?) {
@@ -178,7 +197,7 @@ class SkyjoViewModel(application: Application) : AndroidViewModel(application) {
         players.clear()
         winner.value = null
         activeGroupName.value = null
-        currentScreen.value = Screen.Setup
+        currentScreen.value = Screen.Main
         viewModelScope.launch {
             PlayerStorage.saveCurrentGame(getApplication(), null)
         }
