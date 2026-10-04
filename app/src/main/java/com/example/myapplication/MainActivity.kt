@@ -504,11 +504,26 @@ fun WinnerScreen(viewModel: SkyjoViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
         
-        Button(
-            onClick = { viewModel.goToMain() },
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Back to Games List")
+            Button(
+                onClick = { viewModel.resetScores() },
+                modifier = Modifier.weight(1f),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                Text("Reset Scores & Play Again")
+            }
+            Button(
+                onClick = { viewModel.goToMain() },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Games List")
+            }
         }
     }
 }
